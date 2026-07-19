@@ -1,1 +1,1 @@
-worker: python Telegram_bot/main.py
+worker: python main.py
