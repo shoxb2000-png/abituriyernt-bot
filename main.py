@@ -1,5 +1,6 @@
 import asyncio
 import os
+import json
 import firebase_admin
 from firebase_admin import credentials, db
 from dotenv import load_dotenv
@@ -16,22 +17,44 @@ load_dotenv()
 # =========================
 # BOT TOKEN
 # =========================
-TOKEN = os.getenv("TELEGRAM_TOKEN", "8900139451:AAHMLIYUi789MtY-Eh7TvEcr4QjSs3d4QRw")
+TOKEN = os.getenv("TELEGRAM_TOKEN")
+if not TOKEN:
+    raise ValueError("❌ TELEGRAM_TOKEN env o'zgaruvchisi topilmadi! Render-da o'rnatib qo'ying.")
 
 # =========================
 # FIREBASE
 # =========================
 try:
-    cred = credentials.Certificate("serviceAccountKey.json")
+    creds_json = os.getenv("FIREBASE_CREDENTIALS_JSON")
+    creds_path = os.getenv("FIREBASE_CREDENTIAL_PATH")
+    
+    if creds_json:
+        # JSON string-dan credentials yaratish
+        cred = credentials.Certificate(json.loads(creds_json))
+    elif creds_path:
+        # Fayl yo'lidan credentials yaratish
+        cred = credentials.Certificate(creds_path)
+    else:
+        raise ValueError(
+            "❌ Firebase credentials topilmadi!\n"
+            "   Quyidagilardan birini o'rnatib qo'ying:\n"
+            "   - FIREBASE_CREDENTIALS_JSON (JSON string)\n"
+            "   - FIREBASE_CREDENTIAL_PATH (fayl yo'li)"
+        )
+    
     firebase_admin.initialize_app(
         cred,
         {
             "databaseURL": "https://abituriyent-16e96-default-rtdb.europe-west1.firebasedatabase.app"
         }
     )
-except ValueError:
+except ValueError as e:
+    print(f"⚠️ Firebase konfiguratsiya xatosi: {str(e)}")
+    raise
+except Exception as e:
     # Agar allaqachon initsializatsiya qilingan bo'lsa
-    pass
+    if "already exists" not in str(e):
+        print(f"⚠️ Firebase xatosi: {str(e)}")
 
 ref = db.reference("phone_verifications")
 
@@ -46,7 +69,7 @@ def push_to_github(commit_message="Auto-update from bot"):
         github_branch = os.getenv("GITHUB_BRANCH", "main")
         
         if not github_token or not github_repo:
-            print("⚠️ GitHub credentials topilmadi")
+            print("⚠️ GitHub credentials topilmadi - push o'tkazib yuborilmoqda")
             return False
         
         # Local git repo
@@ -97,7 +120,7 @@ def test_firebase():
     except Exception as e:
         print(f"\n❌ Firebase xatosi: {str(e)}")
         print("❌ Tekshiringlar:")
-        print("   1. serviceAccountKey.json fayli mavjudmi?")
+        print("   1. FIREBASE_CREDENTIALS_JSON yoki FIREBASE_CREDENTIAL_PATH to'g'rimi?")
         print("   2. Firebase URL to'g'rimi?")
         print("   3. Database rules to'g'rimi?")
         print("="*50 + "\n")
@@ -209,5 +232,6 @@ async def main():
         bot,
         polling_timeout=10
     )
+
 if __name__ == "__main__":
     asyncio.run(main())
