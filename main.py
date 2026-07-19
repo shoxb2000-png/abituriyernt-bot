@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart
 from aiogram.types import Message, Update, ReplyKeyboardMarkup, KeyboardButton
+from threading import Thread
 
 # Flask app
 app = Flask(__name__)
@@ -35,7 +36,7 @@ try:
     
     if creds_json:
         creds_dict = json.loads(creds_json)
-        # Fix escaped newlines in the private key (common Render env issue)
+        # Fix escaped newlines in the private key
         if isinstance(creds_dict, dict) and "private_key" in creds_dict:
             creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
         cred = credentials.Certificate(creds_dict)
@@ -88,13 +89,11 @@ async def contact_handler(message: Message):
         # Firebase-dan qidirish
         user = ref.child(phone).get()
         
-        # ✅ TUZATILDI: .val() qo'shildi
         if user.val() is None:
             print(f"❌ Raqam bazada yo'q: {phone}")
             await message.answer(f"❌ Ushbu telefon raqami topilmadi.\n\n📞 Izlangan raqam: {phone}")
             return
 
-        # ✅ TUZATILDI: user_data = user.val() (dict)
         user_data = user.val()
         print(f"📋 User data: {user_data}")
         
@@ -117,21 +116,6 @@ async def contact_handler(message: Message):
         await message.answer(f"⚠️ Xato yuz berdi:\n{str(e)}")
 
 # =========================
-# WEBHOOK ENDPOINT
-# =========================
-@app.route("/webhook", methods=["POST"])
-def webhook():
-    """✅ TUZATILDI: async o'rniga sync, asyncio.run() ishlatildi"""
-    try:
-        update_data = request.get_json()
-        update = Update(**update_data)
-        asyncio.run(dp.feed_update(bot, update))
-        return "ok", 200
-    except Exception as e:
-        print(f"❌ Webhook xatosi: {e}")
-        return "error", 500
-
-# =========================
 # HEALTH CHECK
 # =========================
 @app.route("/", methods=["GET"])
@@ -139,33 +123,30 @@ def health():
     return "🤖 Bot ishlab turibdi!", 200
 
 # =========================
-# WEBHOOK REGISTRATION
+# POLLING LOOP (separate thread)
 # =========================
-async def register_webhook():
-    webhook_url = os.getenv("WEBHOOK_URL")
-    if not webhook_url:
-        print("⚠️ WEBHOOK_URL o'zgaruvchisi topilmadi")
-        return
-    
-    try:
-        # ✅ TUZATILDI: set_webhook() → set_webhook_url()
-        await bot.set_webhook_url(webhook_url)
-        print(f"✅ Webhook ro'yxatdan o'tkazildi: {webhook_url}")
-    except Exception as e:
-        print(f"⚠️ Webhook ro'yxatlash xatosi: {e}")
+async def start_polling():
+    """Bot polling rejimida ishga tushirish"""
+    print("✅ Bot polling rejimida ishga tushdi...")
+    await dp.start_polling(bot, polling_timeout=10)
+
+def run_polling():
+    """Separate thread-da polling ishga tushirish"""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(start_polling())
 
 # =========================
 # APP RUN
 # =========================
 if __name__ == "__main__":
-    # Webhook ro'yxatdan o'tkazish
-    try:
-        asyncio.run(register_webhook())
-    except Exception as e:
-        print(f"⚠️ Webhook init xatosi: {e}")
+    # Polling-ni separate thread-da ishga tushirish
+    polling_thread = Thread(target=run_polling, daemon=True)
+    polling_thread.start()
     
     port = int(os.getenv("PORT", 5000))
     print(f"✅ Bot ishga tushdi")
-    print(f"🚀 Web server {port}-portda ishga tushmoqda...")
+    print(f"🚀 Flask server {port}-portda ishga tushmoqda...")
     
-    app.run(host="0.0.0.0", port=port, debug=False)
+    # Flask server
+    app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
