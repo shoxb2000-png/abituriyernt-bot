@@ -1,0 +1,21 @@
+# Ignore sensitive files and env
+.env
+*.env
+serviceAccountKey.json
+Telegram_bot/serviceAccountKey.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual env
+.venv/
+venv/
+ENV/
+env/
+
+# OS files
+.DS_Store
+Thumbs.db
