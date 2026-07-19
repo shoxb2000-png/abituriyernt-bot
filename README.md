@@ -1,6 +1,6 @@
 # Telegram Bot - Render Web Service Deploy
 
-Bu bot **Web Service** sifatida Render-da ishlab turadi (24/7, keep-alive kerak emas).
+Bu bot **Web Service** sifatida Render-da ishlab turadi (24/7, webhook orqali).
 
 ## ⚠️ Muhim Xavfsizlik Eslatmalari
 
@@ -13,15 +13,17 @@ Bu bot **Web Service** sifatida Render-da ishlab turadi (24/7, keep-alive kerak 
 ```
 User sends message to Telegram Bot
          ↓
-Telegram sends webhook request to bot URL
+Telegram sends webhook POST request
          ↓
-Flask receives POST request at /webhook
+Flask receives POST at /webhook
          ↓
-Bot handler processes message
+Bot handler processes message (contact)
          ↓
-Firebase queries phone verification data
+Firebase queries phone_verifications database
          ↓
-Bot sends response back to user
+Bot sends verification code to user
+         ↓
+Firebase marks user as verified
 ```
 
 ## How to run (local)
@@ -51,7 +53,7 @@ python main.py
 - **Environment:** Python 3
 - **Build Command:** `pip install -r requirements.txt`
 - **Start Command:** `python main.py`
-- **Plan:** Free
+- **Plan:** Free (24/7 ishlash uchun)
 
 ### 2. Environment Variables o'rnatish
 
@@ -83,9 +85,9 @@ Push qiling GitHub-ga va Render avtomatik deploy qiladi ✅
 ```
 .
 ├── main.py              Web service entry point (Flask + aiogram webhook)
-├── requirements.txt     Python dependencies (Flask qo'shildi)
+├── requirements.txt     Python dependencies (Flask, Werkzeug)
 ├── Procfile             Web service deployment config
-├── runtime.txt          Python versiyasi
+├── runtime.txt          Python versiyasi (3.11.16)
 ├── .gitignore           Sensitive files excludes
 ├── .env.example         Environment variables example
 └── README.md            Bu fayl
@@ -95,8 +97,8 @@ Push qiling GitHub-ga va Render avtomatik deploy qiladi ✅
 
 ✅ Telegram bot /start komandasiga javob beradi
 ✅ Foydalanuvchi telefon raqamini yuboradi
-✅ Firebase Realtime Database-dan telefon ma'lumotlarini qidiradi
-✅ Tasdiqlash kodi olmaganlarni qayta-qayta ko'rsatadi
+✅ **Firebase Realtime Database-dan telefon ma'lumotlarini qidiradi** ✅ FIXED
+✅ **Tasdiqlash kodi qaytaradi** ✅ FIXED
 ✅ User verified deb belgilash
 ✅ **24/7 Web Service sifatida ishlab turadi** (Render free plan-da)
 ✅ Webhook orqali Telegram-dan message qabul qiladi
@@ -112,14 +114,22 @@ Push qiling GitHub-ga va Render avtomatik deploy qiladi ✅
 - `FIREBASE_CREDENTIALS_JSON` yoki `FIREBASE_CREDENTIAL_PATH` to'g'ri qilib ko'rining
 - JSON valid ekanligini tekshiring
 - Firebase Realtime Database rules-larini tekshiring
+- Render logs: `firebase_admin.initialize_app()` xatosini ko'ring
 
-### Bot salomdimadi
+### Bot salomdimadi (/start ishlasa ham)
 - `TELEGRAM_TOKEN` to'g'rimi tekshiring
 - Token active va revoke qilinmagan ekanligini tekshiring
+- Render logs-larida xatosini ko'ring
+
+### Telefon verifikatsiyasi ishlamadi
+- Firebase database-da `phone_verifications` collection mavjud ekanligini tekshiring
+- Telefon raqamlari to'g'ri formatda saqlanganini tekshiring (+ belgisiz)
+- Database rules-larini tekshiring (read/write access)
 
 ### Webhook registratsiyasi ishlamadi
-- `WEBHOOK_URL` to'g'rimi tekshiring (https bilan bo'lishi kerak)
+- `WEBHOOK_URL` o'zgaruvchisi o'rnatilganini tekshiring (https bilan bo'lishi kerak)
 - Render app fully deploy bo'linganni kutish kerak
+- Render logs-larida "Webhook ro'yxatdan o'tkazildi" ko'rish kerak
 
 ### Render logs-larida xatolar
 - Render dashboard-da "Logs" tab-da xatolarni ko'ring
@@ -128,8 +138,15 @@ Push qiling GitHub-ga va Render avtomatik deploy qiladi ✅
 
 ## Foydalanish
 
-1. Telegram-da @abituriyernt-bot-ga /start yuboringiz
+1. Telegram-da @YOUR_BOT_GA `/start` yuboringiz
 2. "📱 Telefon raqamni yuborish" tugmasini boshing
 3. Telefon raqamingizni yuboring
-4. Bot Firebase-dan tasdiqlash kodi oladi va ko'rsatadi
+4. Bot Firebase-dan tasdiqlash kodi oladi va ko'rsatadi ✅
 5. User verified deb belgilanadi ✅
+
+## Recent Fixes (2026-07-19)
+
+✅ **Line 93:** Firebase `.val()` method qo'shildi (user_data = user.val())
+✅ **Line 117:** Async webhook sync ga o'zgartirildi (asyncio.run() qo'shildi)
+✅ **Line 143:** `set_webhook()` → `set_webhook_url()` tuzatildi
+✅ **requirements.txt:** Werkzeug qo'shildi Flask stability uchun
